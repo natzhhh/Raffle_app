@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    
+    {% if user %}
+        <div class="alert alert-info shadow-sm d-flex justify-content-between align-items-center">
+            <div>
+                Welcome back, <strong>{{ user.full_name }}</strong>! <br>
+                <small>Your access is active until: 
+                    <span class="fw-bold">{{ user.expiry_date.strftime('%Y-%m-%d') if user.expiry_date else 'No Date Set' }}</span>
+                </small>
+            </div>
+            <a href="/logout" class="btn btn-sm btn-outline-info">Logout</a>
+        </div>
+    {% else %}
+        <div class="alert alert-secondary shadow-sm">
+            Viewing as a Guest. <a href="/posting" class="fw-bold">Login to Post</a>
+        </div>
+    {% endif %}
+
+    <hr class="my-4">
+
+<div class="container mt-4 mb-5">
+    <h3 class="text-center mb-4 fw-bold">
+        <i class="fas fa-trophy text-warning"></i> Recent Hall of Fame <i class="fas fa-trophy text-warning"></i>
+    </h3>
+    
+    <div class="row g-3">
+        {% for raffle in recent_winners %}
+            {# 🚀 LOGIC: Only show in Hall of Fame if 60 seconds have passed since draw_start_time #}
+            {% set show_hall = true %}
+            {% if raffle.draw_start_time %}
+                {% if now < (raffle.draw_start_time + timedelta(seconds=60)) %}
+                    {% set show_hall = false %}
+                {% endif %}
+            {% endif %}
+
+            {% if show_hall %}
+            <div class="col-md-4 col-lg-3">
+                <div class="card border-0 shadow-sm h-100" style="background: #ffffff; border-radius: 15px;">
+                    <div class="card-body text-center">
+                        <h6 class="fw-bold text-uppercase text-muted small mb-3">{{ raffle.raffle_name }}</h6>
+                        <div class="mb-3 p-2 rounded bg-light border-start border-warning border-4">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="fs-4">🥇</span>
+                                <div class="text-end">
+                                    <div class="fw-bold text-dark" style="font-size: 0.9rem;">{{ raffle.winner.buyer_name }}</div>
+                                    <span class="badge bg-primary">#{{ raffle.winner.number_selected }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% if raffle.winner_2_id %}
+                        <div class="p-2 rounded bg-light border-start border-secondary border-4">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="fs-4">🥈</span>
+                                <div class="text-end">
+                                    <div class="fw-bold text-dark" style="font-size: 0.9rem;">{{ raffle.winner_2.buyer_name }}</div>
+                                    <span class="badge bg-secondary">#{{ raffle.winner_2.number_selected }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                            <div class="p-2 text-muted small italic">Single Prize Draw</div>
+                        {% endif %}
+                        <div class="mt-3 pt-2 border-top" style="font-size: 0.7rem; color: #bbb;">
+                            Winner announced {{ raffle.draw_start_time.strftime('%b %d') if raffle.draw_start_time else '' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+    <hr class="my-5">
+
+    <h2 class="mb-4 text-center">🔥 Live Raffles in Harar</h2>
+<div class="container my-4">
+    <form action="{{ url_for('home') }}" method="GET" class="d-flex shadow-sm p-2 bg-white rounded">
+        <input class="form-control me-2 border-0" 
+               type="search" 
+               name="search" 
+               placeholder="Search raffles (e.g. iPhone, Cash...)" 
+               value="{{ search_query }}"
+               aria-label="Search">
+        <button class="btn btn-primary px-4" type="submit">Search</button>
+        {% if search_query %}
+            <a href="{{ url_for('home') }}" class="btn btn-outline-secondary ms-2">Clear</a>
+        {% endif %}
+    </form>
+    
+    {% if search_query %}
+        <p class="mt-3 text-muted">Showing results for: <strong>{{ search_query }}</strong></p>
+    {% endif %}
+</div>
+    <div class="row">
+        {% for raffle in raffles %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm {% if raffle.winner_id %}border-secondary opacity-75{% else %}border-primary{% endif %}">
+                
+                <div class="card-header {% if raffle.winner_id %}bg-secondary{% elif raffle.tickets|length >= raffle.total_raffles %}bg-warning{% else %}bg-primary{% endif %} text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0" style="font-size: 1rem;">{{ raffle.raffle_name }}</h5>
+                    
+                    {% if raffle.winner_id %}
+                        <span class="badge bg-dark">CLOSED</span>
+                    {% elif raffle.tickets|length >= raffle.total_raffles %}
+                        <span class="badge bg-danger">DRAWING</span>
+                    {% else %}
+                        <span class="badge bg-light text-primary">LIVE</span>
+                    {% endif %}
+                </div>
+
+                <div class="card-body">
+                    <h6 class="text-muted small">Prizes to Win:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>🥇 1st:</strong> {{ raffle.prize_1 }} ETB</li>
+                        {% if raffle.prize_2 %}
+                        <li><strong>🥈 2nd:</strong> {{ raffle.prize_2 }} ETB</li>
+                        {% endif %}
+                    </ul>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small>Ticket Price:</small>
+                        <span class="badge bg-success fs-6">{{ raffle.raffle_value }} ETB</span>
+                    </div>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Availability</small>
+                            <small class="fw-bold">{{ raffle.tickets|length }} / {{ raffle.total_raffles }} Sold</small>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            {% set percent = (raffle.tickets|length / raffle.total_raffles) * 100 %}
+                            <div class="progress-bar {% if percent >= 100 %}bg-danger{% elif percent >= 80 %}bg-warning{% else %}bg-primary{% endif %}" 
+                                 role="progressbar" style="width: {{ percent }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-transparent border-top-0 pb-3">
+                    {# 🚀 BUTTON LOGIC: Hide "Results" until the animation window is over #}
+                    {% set is_drawing = false %}
+                    {% if raffle.draw_start_time %}
+                        {% if now < (raffle.draw_start_time + timedelta(seconds=60)) %}
+                            {% set is_drawing = true %}
+                        {% endif %}
+                    {% endif %}
+
+                    {% if raffle.winner_id and not is_drawing %}
+                        <a href="{{ url_for('select_number', raffle_id=raffle.id) }}" class="btn btn-outline-secondary w-100 fw-bold">
+                            🏆 View Results
+                        </a>
+                    {% elif raffle.tickets|length >= raffle.total_raffles or is_drawing %}
+                        <a href="{{ url_for('select_number', raffle_id=raffle.id) }}" class="btn btn-warning w-100 fw-bold text-white animate-pulse">
+                            ⏳ Watch Live Draw
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('select_number', raffle_id=raffle.id) }}" class="btn btn-primary w-100 fw-bold">
+                            🎟️ Pick a Number
+                        </a>
+                    {% endif %}
+                    
+                    <small class="text-center d-block mt-2 text-muted" style="font-size: 0.75rem;">Payment: {{ raffle.payment_method }}</small>
+                    {% if raffle.winner_id %}
+                   <div class="text-center mt-2">
+                  {% if raffle.winner_payment_proof %}
+                   <small class="text-success fw-bold"><i class="fas fa-check-double"></i> Prizes Fully Paid</small>
+                {% else %}
+                <small class="text-muted">Payment in progress</small>
+                {% endif %}
+               </div>
+                {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+<style>
+/* Added pulse effect for the "Watch Live Draw" button */
+.animate-pulse {
+    animation: pulse-orange 2s infinite;
+}
+@keyframes pulse-orange {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+    70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+</style>
+{% endblock %}

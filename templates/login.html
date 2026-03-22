@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 py-5">
+        <h3 class="text-center mb-4 fw-bold">Poster Login</h3>
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Phone Number</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                    <input type="text" name="phone_number" class="form-control" placeholder="0911..." required>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                    <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 fw-bold">Login to Dashboard</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

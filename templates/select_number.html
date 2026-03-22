@@ -1,0 +1,349 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+
+    {# --- SECTION 1: HEADER & TICKET GRID (Hide during Animation or if Results are showing) --- #}
+    {% if not show_results and not (raffle.draw_start_time and not raffle.winner_id) %}
+    <div class="mb-4">
+        <a href="/" class="btn btn-sm btn-outline-secondary">← Back to Home</a>
+        <h3 class="mt-2">{{ raffle.raffle_name }}</h3>
+        <p class="badge bg-primary">Ticket Price: {{ raffle.raffle_value }} ETB</p>
+    </div>
+
+    <h5 class="mb-3">Select your lucky number:</h5>
+    
+    <div class="d-flex flex-wrap gap-2">
+        {% for i in range(1, raffle.total_raffles + 1) %}
+            {% set ticket = ticket_map.get(i) %}
+            {% if ticket %}
+                {% if ticket.is_confirmed %}
+                    <button class="btn btn-secondary disabled" style="width: 75px; height: 75px;">
+                        {{ i }}<br><small class="text-truncate">{{ ticket.buyer_name }}</small>
+                    </button>
+                {% else %}
+                    <button class="btn btn-warning disabled text-white" style="width: 75px; height: 75px;">
+                        {{ i }}<br><small>HOLD</small>
+                    </button>
+                {% endif %}
+            {% else %}
+                <button class="btn btn-outline-primary" style="width: 75px; height: 75px;" onclick="openPaymentModal({{ i }})">
+                    {{ i }}
+                </button>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="mt-4 p-3 bg-light rounded">
+        <h6>Legend:</h6>
+        <span class="badge bg-primary">Available</span>
+        <span class="badge bg-warning">Pending Approval</span>
+        <span class="badge bg-secondary">Sold</span>
+    </div>
+    {% endif %}
+<hr class="my-5">
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between">
+                <span>💬 Raffle Discussion</span>
+                <small>{{ raffle.messages|length }} messages</small>
+            </div>
+            
+          <div id="chat-window" class="card-body overflow-auto" style="height: 300px; background: #f8f9fa;">
+    {% for msg in raffle.messages|sort(attribute='created_at') %}
+        <div class="mb-3 d-flex justify-content-between align-items-start">
+            <div>
+                <div class="d-flex align-items-center mb-1">
+                    <strong class="{% if msg.sender_name == raffle.organizer.full_name %}text-danger{% else %}text-primary{% endif %} me-2" style="font-size: 0.9rem;">
+                        {{ msg.sender_name }}
+                    </strong>
+                    
+                    {% if msg.sender_name == raffle.user.full_name %}
+                        <span class="badge bg-danger" style="font-size: 0.6rem;">
+                            <i class="fas fa-check-circle"></i> ORGANIZER
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div class="p-2 rounded bg-white shadow-sm border-start {% if msg.sender_name == raffle.organizer.full_name %}border-danger border-4{% endif %}" style="max-width: 100%;">
+                    <span style="font-size: 0.95rem;">{{ msg.text }}</span>
+                </div>
+                <div class="text-muted ms-1" style="font-size: 0.65rem;">{{ msg.created_at.strftime('%H:%M') }}</div>
+            </div>
+
+            {# 🗑️ DELETE BUTTON: Only visible to the Raffle Owner #}
+            {% if session.get('user_id') == raffle.user_id %}
+                <a href="/delete-message/{{ msg.id }}" class="text-muted text-decoration-none ms-2" title="Delete Message">
+                    <i class="fas fa-times-circle"></i>
+                </a>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="text-center text-muted mt-5 small">No messages yet. Ask the organizer a question!</p>
+    {% endfor %}
+</div>
+          <div class="card-footer bg-white border-top-0">
+             <form action="/send-message/{{ raffle.id }}" method="POST" class="row g-2">
+                <div class="col-4">
+                    <input type="text" name="name" class="form-control form-control-sm" 
+                       placeholder="Your Name" 
+                        {% if session.get('user_id') %}
+                       {# If logged in, use the session user's name and lock the field #}
+                       value="{{ raffle.user.full_name }}" readonly
+                        {% endif %}
+                           required>
+                </div>
+               <div class="col-6">
+                    <input type="text" name="text" class="form-control form-control-sm" placeholder="Write a message..." required>
+                   </div>
+              <div class="col-2">
+                 <button type="submit" class="btn btn-primary btn-sm w-100">
+                  <i class="fas fa-paper-plane"></i>
+                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-scroll chat to bottom on load
+    const chatWindow = document.getElementById('chat-window');
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+</script>
+    {# --- SECTION 2: THE LIVE DRAW ARENA (Animation & Timer) --- #}
+    {% if raffle.draw_start_time and not show_results %}
+    <div id="raffle-arena" style="display: none; height: 400px; width: 100%; position: relative;">
+        <div id="glass-box" class="glass-box"></div>
+        <div id="winner-display" class="winner-popout"></div>
+    </div>
+
+    <div id="draw-alert" class="alert alert-danger text-center shadow-lg">
+        <h4 id="timer-label">📢 LIVE DRAW STARTING</h4>
+        <div id="countdown-clock" class="display-4 fw-bold">00:00</div>
+        <p id="timer-subtext">Stay on this page to watch the results!</p>
+    </div>
+
+    <input type="hidden" id="hiddenWin1" value="{{ raffle.winner.number_selected if raffle.winner else '??' }}">
+    <input type="hidden" id="hiddenWin2" value="{{ raffle.winner_2.number_selected if raffle.winner_2 else '??' }}">
+
+    <style>
+        #raffle-arena { margin: 40px 0; text-align: center; }
+        .glass-box {
+            width: 250px; height: 250px; margin: 0 auto; position: relative;
+            transform-style: preserve-3d; background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px);
+            border-radius: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.1), inset 0 0 50px rgba(255,255,255,0.5);
+            animation: rotateBox 15s infinite linear; overflow: hidden;
+        }
+        .ball {
+            position: absolute; width: 35px; height: 35px;
+            background: radial-gradient(circle at 10px 10px, #ffdb4d, #f39c12);
+            border: 1px solid #d35400; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: bold; color: #fff; z-index: 5;
+        }
+        .winner-popout {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0);
+            width: 140px; height: 140px; background: linear-gradient(135deg, #f1c40f, #f39c12);
+            border-radius: 50%; border: 8px solid white; box-shadow: 0 0 30px rgba(243, 156, 18, 0.6);
+            z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .winner-popout.active { transform: translate(-50%, -50%) scale(1.2); }
+        @keyframes rotateBox {
+            0% { transform: perspective(1000px) rotateY(-10deg) rotateX(5deg); }
+            50% { transform: perspective(1000px) rotateY(10deg) rotateX(-5deg); }
+            100% { transform: perspective(1000px) rotateY(-10deg) rotateX(5deg); }
+        }
+    </style>
+    {% endif %}
+
+    {# --- SECTION 3: FINAL RESULTS (Confetti Box) --- #}
+    {% if show_results %}
+    <div class="text-center p-5 mb-4 rounded-3 shadow-lg border border-warning bg-white">
+        <h2 class="text-uppercase fw-bold text-warning mb-4">🏆 Draw Results 🏆</h2>
+        <div class="row justify-content-center">
+            
+            <div class="col-md-5 mb-3">
+                <div class="p-4 border border-primary rounded shadow-sm bg-light h-100 d-flex flex-column">
+                    <h1 class="display-6">🥇</h1>
+                    <h4 class="fw-bold">1st Prize</h4>
+                    <p class="mb-1 text-primary fw-bold">{{ raffle.prize_1 }} ETB</p>
+                    <div class="badge bg-primary fs-5 mb-2">#{{ raffle.winner.number_selected }}</div>
+                    <h5 class="text-truncate">{{ raffle.winner.buyer_name }}</h5>
+                    
+                    <div class="mt-auto pt-3 border-top">
+                        {% if raffle.winner_payment_proof %}
+                            <span class="badge bg-success mb-2"><i class="fas fa-check-circle"></i> Paid to Winner</span><br>
+                            <div class="btn-group w-100">
+                                <a href="{{ url_for('static', filename='uploads/' + raffle.winner_payment_proof) }}" 
+                                   target="_blank" class="btn btn-sm btn-outline-dark">
+                                   <i class="fas fa-eye"></i> View
+                                </a>
+                                <a href="{{ url_for('static', filename='uploads/' + raffle.winner_payment_proof) }}" 
+                                   download="Winner_1st_Receipt" class="btn btn-sm btn-dark">
+                                   <i class="fas fa-download"></i> Save
+                                </a>
+                            </div>
+                        {% else %}
+                            <span class="badge bg-secondary">Payment Processing...</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if raffle.winner_2_id %}
+            <div class="col-md-5 mb-3">
+                <div class="p-4 border border-secondary rounded shadow-sm bg-light h-100 d-flex flex-column">
+                    <h1 class="display-6">🥈</h1>
+                    <h4 class="fw-bold">2nd Prize</h4>
+                    <p class="mb-1 text-secondary fw-bold">{{ raffle.prize_2 }} ETB</p>
+                    <div class="badge bg-secondary fs-5 mb-2">#{{ raffle.winner_2.number_selected }}</div>
+                    <h5 class="text-truncate">{{ raffle.winner_2.buyer_name }}</h5>
+
+                    <div class="mt-auto pt-3 border-top">
+                        {% if raffle.winner_2_payment_proof %}
+                            <span class="badge bg-success mb-2"><i class="fas fa-check-circle"></i> Paid to Winner</span><br>
+                            <div class="btn-group w-100">
+                                <a href="{{ url_for('static', filename='uploads/' + raffle.winner_2_payment_proof) }}" 
+                                   target="_blank" class="btn btn-sm btn-outline-dark">
+                                   <i class="fas fa-eye"></i> View
+                                </a>
+                                <a href="{{ url_for('static', filename='uploads/' + raffle.winner_2_payment_proof) }}" 
+                                   download="Winner_2nd_Receipt" class="btn btn-sm btn-dark">
+                                   <i class="fas fa-download"></i> Save
+                                </a>
+                            </div>
+                        {% else %}
+                            <span class="badge bg-secondary">Payment Processing...</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+        <p class="text-muted mt-4 small">Transparency is our priority. Winners can download these receipts for their records.</p>
+    </div>
+    {% endif %}
+
+</div>
+
+{# --- MODAL --- #}
+<div id="paymentModal" style="display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog mt-5">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Confirm Ticket #<span id="displayNum"></span></h5>
+                <button type="button" class="btn-close btn-close-white" onclick="closeModal()"></button>
+            </div>
+            <form action="/buy-ticket/{{ raffle.id }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <p class="text-muted small">Please pay <strong>{{ raffle.raffle_value }} ETB</strong> via {{ raffle.payment_method }}.</p>
+                    <input type="hidden" name="number" id="inputNum">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="name" class="form-control" placeholder="Abebe Kebede" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" name="phone" class="form-control" placeholder="09..." required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Upload Screenshot</label>
+                        <input type="file" name="screenshot" class="form-control" accept="image/*" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success">Submit Receipt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script>
+    function openPaymentModal(num) {
+        document.getElementById('displayNum').innerText = num; 
+        document.getElementById('inputNum').value = num;
+        document.getElementById('paymentModal').style.display = 'block';
+    }
+    function closeModal() { document.getElementById('paymentModal').style.display = 'none'; }
+    window.onclick = function(e) { if (e.target === document.getElementById('paymentModal')) closeModal(); };
+
+    function startTimer() {
+        const rawTime = "{{ raffle.draw_start_time }}";
+        const drawTime = new Date(rawTime + "Z").getTime(); 
+        const x = setInterval(function() {
+            const now = new Date().getTime();
+            const distance = drawTime - now;
+            if (distance > 0) {
+                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                document.getElementById("countdown-clock").innerHTML = minutes + "m " + seconds + "s ";
+            } else {
+                clearInterval(x);
+                run3DAnimation();
+            }
+        }, 1000);
+    }
+
+    function run3DAnimation() {
+        const win1 = document.getElementById('hiddenWin1').value;
+        const win2 = document.getElementById('hiddenWin2').value;
+        document.getElementById("draw-alert").style.display = 'none';
+        document.getElementById("raffle-arena").style.display = 'block';
+        const box = document.getElementById("glass-box");
+        const boughtNumbers = [{% for t in raffle.tickets if t.is_confirmed %}{{ t.number_selected }},{% endfor %}];
+        const balls = [];
+
+        boughtNumbers.forEach(num => {
+            let ballEl = document.createElement('div');
+            ballEl.className = 'ball'; ballEl.innerHTML = num;
+            box.appendChild(ballEl);
+            balls.push({ el: ballEl, x: Math.random()*215, y: Math.random()*215, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12 });
+        });
+
+        const physicsInterval = setInterval(() => {
+            balls.forEach(b => {
+                b.x += b.vx; b.y += b.vy;
+                if (b.x <= 0 || b.x >= 215) b.vx *= -1;
+                if (b.y <= 0 || b.y >= 215) b.vy *= -1;
+                b.el.style.left = b.x + 'px'; b.el.style.top = b.y + 'px';
+            });
+        }, 30);
+
+        setTimeout(() => {
+            const popout = document.getElementById("winner-display");
+            popout.innerHTML = `<small>1st Prize</small><h2 style="font-size: 3rem; margin:0;">#${win1}</h2>`;
+            popout.classList.add("active");
+            setTimeout(() => {
+                popout.classList.remove("active");
+                setTimeout(() => {
+                    popout.innerHTML = `<small>2nd Prize</small><h2 style="font-size: 3rem; margin:0;">#${win2}</h2>`;
+                    popout.style.background = "linear-gradient(135deg, #bdc3c7, #7f8c8d)";
+                    popout.classList.add("active");
+                    setTimeout(() => { window.location.reload(); }, 3000);
+                }, 1000);
+            }, 4000);
+        }, 3000);
+    }
+
+    window.onload = function() {
+        {% if raffle.draw_start_time and not show_results %} startTimer(); {% endif %}
+        {% if show_results %}
+            var end = Date.now() + (5 * 1000);
+            (function frame() {
+                confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 } });
+                confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        {% endif %}
+    };
+</script>
+{% endblock %}

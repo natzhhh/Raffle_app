@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary"><i class="fas fa-trophy text-warning"></i> My Prize History</h2>
+    
+    {% if wins %}
+        <div class="row">
+            {% for raffle in wins %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 border-warning shadow-sm">
+                    <div class="card-header bg-warning text-dark fw-bold">
+                        🎉 WINNER
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ raffle.raffle_name }}</h5>
+                        <p class="card-text text-muted">
+                            <strong>Prize:</strong> {{ raffle.prize_1 }}<br>
+                            <strong>Winning Number:</strong> 
+                            <span class="badge bg-success">{{ raffle.winner.number_selected }}</span>
+                        </p>
+                    </div>
+                    <div class="card-footer bg-white text-muted small">
+                        Drawn on: {{ raffle.draw_start_time.strftime('%Y-%m-%d') }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <h3 class="text-muted">No prizes yet.</h3>
+            <p>Don't give up! Your lucky number is out there.</p>
+            <a href="{{ url_for('home') }}" class="btn btn-primary">Browse Live Raffles</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

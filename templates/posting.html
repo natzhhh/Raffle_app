@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        
+        {% if verified %}
+        <div class="card mb-4 border-success shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Welcome, {{ user.full_name }}</h5>
+                <p class="card-text mb-1">
+                    <strong>Status:</strong> <span class="badge bg-success">Active Account</span>
+                </p>
+                <p class="card-text">
+                    <strong>Subscription Expires:</strong> 
+                    <span class="text-danger fw-bold">
+                        {{ user.expiry_date.strftime('%B %d, %Y') }}
+                    </span>
+                </p>
+                <small class="text-muted">Plan: {{ user.sub_type }}</small>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h3>Create a New Post</h3>
+                <form action="/submit-post" method="POST" id="raffleForm">
+    <input type="hidden" name="user_id" value="{{ user.id }}">
+    
+    <div class="mb-3">
+        <label>Raffle Name</label>
+        <input type="text" name="raffle_name" class="form-control" placeholder="e.g. Harar Tech Giveaway" required>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label>One Raffle Value (ETB)</label>
+            <input type="number" name="raffle_value" id="val" class="form-control" required>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label>Total Number of Raffles</label>
+            <input type="number" name="total_raffles" id="total" class="form-control" required>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label>Payment Method for Winners</label>
+        <input type="text" name="payment_method" class="form-control" placeholder="Telebirr / CBE" required>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label>1st Prize Value</label>
+            <input type="number" name="prize_1" id="p1" class="form-control" required>
+        </div>
+        <div class="col-md-6 mb-3">
+    <label>2nd Prize Value (Optional)</label>
+    <input type="number" name="prize_2" id="p2" class="form-control" placeholder="Leave empty if none">
+      </div>
+    </div>
+
+    <div id="math-check" class="alert alert-secondary mt-2">
+        Total Pot: <span id="pot">0</span> ETB <br>
+        Required Prize Range: <span id="range">0 - 0</span> ETB
+    </div>
+
+    <button type="submit" id="submitBtn" class="btn btn-success w-100 mt-3">Publish Raffle</button>
+</form>
+
+
+            </div>
+        </div>
+
+        {% else %}
+        <div class="card shadow-sm mt-5">
+            <div class="card-body">
+                <h3 class="text-center">Poster Access</h3>
+                <form action="/posting" method="POST">
+                    <div class="mb-3">
+                        <label>Phone Number</label>
+                        <input type="tel" name="phone" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Login to Post</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+
+<script>
+    // 1. Give the function a clear name
+    function calculateRaffleMath() {
+        // Get values and turn them into numbers
+        const v = parseFloat(document.getElementById('val').value) || 0;
+        const t = parseFloat(document.getElementById('total').value) || 0;
+        const p1 = parseFloat(document.getElementById('p1').value) || 0;
+        const p2 = parseFloat(document.getElementById('p2').value) || 0; 
+        
+        const revenue = v * t;
+        const totalPrizes = p1 + p2;
+        
+        // Display calculations to user
+        document.getElementById('revText').innerText = revenue;
+        document.getElementById('prizeText').innerText = totalPrizes;
+
+        // Apply your 80% - 95% Rule
+        if (revenue > 0) {
+            const min = revenue * 0.80;
+            const max = revenue * 0.95;
+
+            if (totalPrizes >= min && totalPrizes <= max) {
+                document.getElementById('statusMsg').innerHTML = "✅ Valid Prize Ratio!";
+                document.getElementById('submitBtn').disabled = false;
+            } else {
+                document.getElementById('statusMsg').innerHTML = `❌ Prizes must be between ${min.toFixed(0)} - ${max.toFixed(0)} ETB.`;
+                document.getElementById('submitBtn').disabled = true;
+            }
+        }
+    }
+
+    // 2. Attach the function to your inputs
+    // This tells the browser: "Whenever these specific boxes change, run calculateRaffleMath"
+    document.querySelectorAll('#val, #total, #p1, #p2').forEach(input => {
+        input.addEventListener('input', calculateRaffleMath);
+    });
+</script>
+{% endblock %}

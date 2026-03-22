@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+
+    {% if is_admin %}
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="text-danger">🛡️ Harar Admin Verification Panel</h3>
+            <a href="/logout" class="btn btn-outline-secondary btn-sm">Logout</a>
+        </div>
+        
+        {% if pending %}
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Full Name</th>
+                        <th>Phone Number</th>
+                        <th>Payment Via</th>
+                        <th>Account/Phone</th>
+                        <th>Plan</th>
+                        <th>Receipt Screenshot</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in pending %}
+                    <tr>
+                        <td>{{ user.full_name }}</td>
+                        <td>{{ user.phone_number }}</td>
+                        <td>{{ user.payment_company }}</td>
+                        <td>{{ user.account_number }}</td>
+                        <td>{{ user.sub_type }}</td>
+                        <td>
+                            <a href="{{ url_for('static', filename='uploads/' + user.receipt_image) }}" target="_blank">
+                                <img src="{{ url_for('static', filename='uploads/' + user.receipt_image) }}" width="80" class="img-thumbnail" alt="Receipt">
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('approve_user', user_id=user.id) }}" class="btn btn-success btn-sm">✅ Verify & Approve</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="alert alert-info">No pending registrations at the moment. Good job, Admin!</div>
+        {% endif %}
+
+    {% else %}
+        <div class="row justify-content-center">
+            <div class="col-md-4">
+                <div class="card shadow-sm mt-5">
+                    <div class="card-body text-center">
+                        <h3 class="card-title">Admin Secure Login</h3>
+                        <form action="/admin" method="POST" class="mt-4">
+                            <div class="mb-3 text-start">
+                                <label class="form-label">Admin Phone</label>
+                                <input type="tel" name="phone" class="form-control" placeholder="09..." required>
+                            </div>
+                            <div class="mb-3 text-start">
+                                <label class="form-label">Password</label>
+                                <input type="password" name="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-danger w-100">Enter Dashboard</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}

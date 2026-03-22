@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <h3 class="mb-4">Create Poster Account</h3>
+        <form action="/submit-registration" method="POST" enctype="multipart/form-data">
+            
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input type="text" name="full_name" class="form-control" placeholder="Abebe Balcha" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Primary Phone Number</label>
+                <input type="tel" name="phone_number" class="form-control" placeholder="0911223344" required>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Confirm Password</label>
+                    <input type="password" name="confirm_password" class="form-control" required>
+                </div>
+            </div>
+
+            <hr>
+            <h5 class="mb-3">Payment Details</h5>
+
+            <div class="mb-3">
+                <label class="form-label">Payment Company (e.g., Telebirr, CBE)</label>
+                <input type="text" name="payment_company" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Payment Account Number</label>
+                <input type="text" name="account_number" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Subscription Plan</label>
+                <select name="sub_type" class="form-select">
+                    <option value="1 Month">1 Month - [Amount] ETB</option>
+                    <option value="1 Year">1 Year - [Amount] ETB</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Upload Receipt Screenshot</label>
+                <input type="file" name="receipt" class="form-control" accept="image/*" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Submit for Approval</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
